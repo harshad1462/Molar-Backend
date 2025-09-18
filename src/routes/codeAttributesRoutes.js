@@ -7,5 +7,7 @@ router.get('/', codeAttributesController.findAll);
 router.get('/:id', codeAttributesController.findOne);
 router.put('/:id', codeAttributesController.update);
 router.delete('/:id', codeAttributesController.delete);
+router.get('/group/:group_code_id', codeAttributesController.findByGroupCodeId);
+router.get('/group/:group_code_id', codeAttributesController.findByGroupCodeId);
 
 module.exports = router;

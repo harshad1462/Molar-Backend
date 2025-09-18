@@ -27,6 +27,20 @@ module.exports = {
       res.status(500).json({ error: error.message });
     }
   },
+findByGroupCodeId: async (req, res) => {
+  try {
+    // console.log('findByGroupCodeId called with group_code_id:', req.params.group_code_id);
+    const groupCodeId = req.params.group_code_id;
+    const codeAttrs = await CodeAttributes.findAll({
+      where: { group_code_id: groupCodeId },
+    });
+    // console.log('Found attributes:', codeAttrs.length);
+    res.json(codeAttrs);
+  } catch (error) {
+    console.error('Error in findByGroupCodeId:', error);
+    res.status(500).json({ error: error.message });
+  }
+},
 
   findOne: async (req, res) => {
     try {

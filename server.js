@@ -1,5 +1,13 @@
 const express = require('express');
 const app = express();
+const cors = require('cors');
+
+app.use(cors({
+  origin: 'http://localhost:5173',  // frontend origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 const sequelize = require('./src/config/database');
 const initModels = require('./src/models/init-models');
 
