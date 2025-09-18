@@ -1,21 +1,16 @@
 const express = require('express');
 const app = express();
-const initModels = require('./models/init-models');
-const Sequelize = require('sequelize');
+const sequelize = require('./src/config/database');
+const initModels = require('./src/models/init-models');
 
-// DB connection setup:
-const sequelize = new Sequelize('molarmap', 'root', 'root', {
-  host: 'localhost',
-  dialect: 'mysql',
-});
-
+// Initialize models
 const models = initModels(sequelize);
 
 app.use(express.json());
 
 // Import routes
-const groupCodeRoutes = require('./routes/groupCodeRoutes');
-const codeAttributesRoutes = require('./routes/codeAttributesRoutes');
+const groupCodeRoutes = require('./src/routes/groupCodeRoutes');
+const codeAttributesRoutes = require('./src/routes/codeAttributesRoutes');
 
 // Use routes
 app.use('/api/group-codes', groupCodeRoutes);
@@ -29,4 +24,4 @@ sequelize.authenticate()
     console.log('Database connected...');
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch(err => console.log('Error: ' + err));
+  .catch(err => console.error('DB connection error:', err));

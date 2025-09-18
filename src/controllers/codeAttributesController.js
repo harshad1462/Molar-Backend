@@ -1,5 +1,7 @@
 const sequelize = require('../config/database');
+// const initModels = require('../src/models/init-models');
 const initModels = require('../models/init-models');
+
 const models = initModels(sequelize); // get the models object
 
 const CodeAttributes = models.code_attributes; // Related model for attributes
