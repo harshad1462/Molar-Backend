@@ -9,7 +9,13 @@ module.exports = {
   // Create a new group code
   create: async (req, res) => {
     try {
-      const newGroupCode = await group_code.create(req.body);
+       const dataToCreate = {
+        ...req.body,
+        updated_date: new Date().toISOString(),
+        updated_by: 'admin', // or get from authenticated user
+        is_active: req.body.is_active !== undefined ? req.body.is_active : true
+      };
+      const newGroupCode = await group_code.create(dataToCreate);
       res.status(201).json(newGroupCode);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -47,7 +53,12 @@ module.exports = {
   update: async (req, res) => {
     try {
       const id = req.params.id;
-      const updated = await group_code.update(req.body, { where: { group_code_id: id } });
+          const dataToUpdate = {
+        ...req.body,
+        updated_date: new Date().toISOString(),
+        updated_by: 'admin' // or get from authenticated user
+      };
+      const updated = await group_code.update(dataToUpdate, { where: { group_code_id: id } });
       if (updated[0] === 0) return res.status(404).json({ error: 'Group Code not found' });
       const updatedGroupCode = await group_code.findByPk(id);
       res.json(updatedGroupCode);

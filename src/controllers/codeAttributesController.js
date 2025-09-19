@@ -12,7 +12,14 @@ const CodeAttributes = models.code_attributes; // Related model for attributes
 module.exports = {
   create: async (req, res) => {
     try {
-      const codeAttr = await CodeAttributes.create(req.body);
+        const dataToCreate = {
+        ...req.body,
+        created_by: 'admin', 
+        updated_date: new Date().toISOString(),
+        updated_by: 'admin', // or get from authenticated user
+        is_active: req.body.is_active !== undefined ? req.body.is_active : true
+      };
+      const codeAttr = await CodeAttributes.create(dataToCreate);
       res.status(201).json(codeAttr);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -56,7 +63,12 @@ findByGroupCodeId: async (req, res) => {
   update: async (req, res) => {
     try {
       const id = req.params.id;
-      const updated = await CodeAttributes.update(req.body, { where: { serial_no: id } });
+        const dataToUpdate = {
+        ...req.body,
+        updated_date: new Date().toISOString(),
+        updated_by: 'admin' // or get from authenticated user
+      };
+      const updated = await CodeAttributes.update(dataToUpdate, { where: { serial_no: id } });
       if (updated[0] === 0) return res.status(404).json({ error: 'Code Attribute not found' });
       const updatedCodeAttr = await CodeAttributes.findByPk(id);
       res.json(updatedCodeAttr);

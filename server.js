@@ -19,8 +19,11 @@ app.use(express.json());
 // Import routes
 const groupCodeRoutes = require('./src/routes/groupCodeRoutes');
 const codeAttributesRoutes = require('./src/routes/codeAttributesRoutes');
+const appointmentRoutes = require('./src/routes/appointmentRoutes');
+
 
 // Use routes
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/group-codes', groupCodeRoutes);
 app.use('/api/code-attributes', codeAttributesRoutes);
 
