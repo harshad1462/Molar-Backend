@@ -1,12 +1,13 @@
 const sequelize = require('../config/database');
 const initModels = require('../models/init-models');
+const { Op } = require('sequelize');
 
 const models = initModels(sequelize);
 const Appointments = models.appointments;
-const Users = models.users; // Assuming you have a users model
+const Users = models.users;
 
 module.exports = {
-  // Get all appointments with user details
+  // Get all appointments with user details and filtering
   findAll: async (req, res) => {
     try {
       const { 
@@ -23,69 +24,78 @@ module.exports = {
       // Build where conditions
       let whereConditions = {};
       let hostWhereConditions = {};
-      let doctorWhereConditions = {};
 
-      // Filter by date
+      // Filter by date - FIXED: Use Op.eq instead of Op.like for DATEONLY fields [web:131][web:132]
       if (date) {
-        whereConditions.date = {
-          [sequelize.Sequelize.Op.like]: `%${date}%`
-        };
+        try {
+          // Decode URL-encoded date and format properly [web:134][web:144]
+          const decodedDate = decodeURIComponent(date);
+          // Ensure proper date format (YYYY-MM-DD)
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (dateRegex.test(decodedDate)) {
+            whereConditions.date = {
+              [Op.eq]: decodedDate // Use Op.eq for exact date match
+            };
+          } else {
+            // If not exact date format, use partial matching on string representation
+            whereConditions.date = {
+              [Op.like]: `%${decodedDate}%`
+            };
+          }
+        } catch (error) {
+          // If decoding fails, use the original date
+          console.warn('Date decoding failed, using original:', date);
+          whereConditions.date = {
+            [Op.like]: `%${date}%`
+          };
+        }
       }
 
       // Filter by treatment
       if (treatment) {
         whereConditions.treatment_type = {
-          [sequelize.Sequelize.Op.like]: `%${treatment}%`
+          [Op.like]: `%${decodeURIComponent(treatment)}%`
         };
       }
 
       // Filter by status
       if (status) {
-        whereConditions.status = status;
+        whereConditions.status = decodeURIComponent(status);
       }
 
       // Filter by host name
       if (hostName) {
         hostWhereConditions = {
-          [sequelize.Sequelize.Op.or]: [
-            { first_name: { [sequelize.Sequelize.Op.like]: `%${hostName}%` } },
-            { last_name: { [sequelize.Sequelize.Op.like]: `%${hostName}%` } },
-            sequelize.where(
-              sequelize.fn('CONCAT', sequelize.col('host_user.first_name'), ' ', sequelize.col('host_user.last_name')),
-              { [sequelize.Sequelize.Op.like]: `%${hostName}%` }
-            )
-          ]
+          name: { [Op.like]: `%${decodeURIComponent(hostName)}%` }
         };
       }
 
-      const appointments = await Appointments.findAndCountAll({
+      const appointmentData = await Appointments.findAndCountAll({
         where: whereConditions,
         include: [
           {
             model: Users,
-            as: 'host_user', // Alias for host user
-            attributes: ['user_id', 'first_name', 'last_name', 'email'],
-            where: hostWhereConditions,
-            required: true
+            as: 'host_user', 
+            attributes: ['user_id', 'name', 'email'],
+            where: Object.keys(hostWhereConditions).length > 0 ? hostWhereConditions : undefined
           },
           {
             model: Users,
-            as: 'doctor_user', // Alias for doctor user
-            attributes: ['user_id', 'first_name', 'last_name', 'email', 'specialization'],
-            where: doctorWhereConditions,
-            required: true
+            as: 'doctor_user',
+            attributes: ['user_id', 'name', 'email', 'specialization']
           }
         ],
-        order: [['created_date', 'DESC']],
+        order: [['created_date', 'DESC']], 
         limit: parseInt(limit),
-        offset: parseInt(offset)
+        offset: offset,
+        distinct: true
       });
 
       // Map the data to match frontend expectations
-      const mappedAppointments = appointments.rows.map(appointment => ({
+      const mappedAppointments = appointmentData.rows.map(appointment => ({
         bookingId: appointment.appointment_id,
-        userName: `${appointment.host_user.first_name} ${appointment.host_user.last_name}`,
-        doctorName: `Dr. ${appointment.doctor_user.first_name} ${appointment.doctor_user.last_name}`,
+        userName: appointment.host_user?.name || 'Unknown',
+        doctorName: `Dr. ${appointment.doctor_user?.name || 'Unknown'}`,
         date: appointment.date,
         time: appointment.time,
         treatment: appointment.treatment_type,
@@ -97,8 +107,8 @@ module.exports = {
         hospital_latitude: appointment.hospital_latitude,
         hospital_longitude: appointment.hospital_longitude,
         specialization: appointment.specialization,
-        hostEmail: appointment.host_user.email,
-        doctorEmail: appointment.doctor_user.email,
+        hostEmail: appointment.host_user?.email,
+        doctorEmail: appointment.doctor_user?.email,
         created_date: appointment.created_date,
         updated_date: appointment.updated_date
       }));
@@ -109,10 +119,10 @@ module.exports = {
         pagination: {
           current_page: parseInt(page),
           per_page: parseInt(limit),
-          total: appointments.count,
-          total_pages: Math.ceil(appointments.count / limit),
+          total: appointmentData.count,
+          total_pages: Math.ceil(appointmentData.count / limit),
           from: offset + 1,
-          to: Math.min(offset + parseInt(limit), appointments.count)
+          to: Math.min(offset + parseInt(limit), appointmentData.count)
         }
       });
 
@@ -135,12 +145,12 @@ module.exports = {
           {
             model: Users,
             as: 'host_user',
-            attributes: ['user_id', 'first_name', 'last_name', 'email', 'phone']
+            attributes: ['user_id', 'name', 'email', 'phone_number']
           },
           {
             model: Users,
             as: 'doctor_user',
-            attributes: ['user_id', 'first_name', 'last_name', 'email', 'phone', 'specialization']
+            attributes: ['user_id', 'name', 'email', 'phone_number', 'specialization']
           }
         ]
       });
@@ -155,8 +165,8 @@ module.exports = {
       // Map the data to match frontend expectations
       const mappedAppointment = {
         bookingId: appointment.appointment_id,
-        userName: `${appointment.host_user.first_name} ${appointment.host_user.last_name}`,
-        doctorName: `Dr. ${appointment.doctor_user.first_name} ${appointment.doctor_user.last_name}`,
+        userName: appointment.host_user?.name || 'Unknown',
+        doctorName: `Dr. ${appointment.doctor_user?.name || 'Unknown'}`,
         date: appointment.date,
         time: appointment.time,
         treatment: appointment.treatment_type,
@@ -169,17 +179,17 @@ module.exports = {
         hospital_longitude: appointment.hospital_longitude,
         specialization: appointment.specialization,
         hostDetails: {
-          id: appointment.host_user.user_id,
-          name: `${appointment.host_user.first_name} ${appointment.host_user.last_name}`,
-          email: appointment.host_user.email,
-          phone: appointment.host_user.phone
+          id: appointment.host_user?.user_id,
+          name: appointment.host_user?.name,
+          email: appointment.host_user?.email,
+          phone: appointment.host_user?.phone_number
         },
         doctorDetails: {
-          id: appointment.doctor_user.user_id,
-          name: `Dr. ${appointment.doctor_user.first_name} ${appointment.doctor_user.last_name}`,
-          email: appointment.doctor_user.email,
-          phone: appointment.doctor_user.phone,
-          specialization: appointment.doctor_user.specialization
+          id: appointment.doctor_user?.user_id,
+          name: `Dr. ${appointment.doctor_user?.name}`,
+          email: appointment.doctor_user?.email,
+          phone: appointment.doctor_user?.phone_number,
+          specialization: appointment.doctor_user?.specialization
         },
         created_date: appointment.created_date,
         updated_date: appointment.updated_date
@@ -192,82 +202,6 @@ module.exports = {
 
     } catch (error) {
       console.error('Error fetching appointment:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
-    }
-  },
-
-  // Update appointment status
-  updateStatus: async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { status } = req.body;
-
-      // Validate status
-      const validStatuses = ['ACCEPT', 'CANCELLED', 'CANCLE', 'COMPLETED', 'REJECT', 'REQUESTED'];
-      if (!validStatuses.includes(status)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid status value'
-        });
-      }
-
-      const updateData = {
-        status: status,
-        updated_by: 'admin', // or get from authenticated user
-        updated_date: new Date().toISOString()
-      };
-
-      const [updatedRows] = await Appointments.update(updateData, {
-        where: { appointment_id: id }
-      });
-
-      if (updatedRows === 0) {
-        return res.status(404).json({
-          success: false,
-          error: 'Appointment not found'
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Appointment status updated successfully'
-      });
-
-    } catch (error) {
-      console.error('Error updating appointment status:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
-    }
-  },
-
-  // Get appointment statistics
-  getStats: async (req, res) => {
-    try {
-      const stats = await Appointments.findAll({
-        attributes: [
-          'status',
-          [sequelize.fn('COUNT', sequelize.col('appointment_id')), 'count']
-        ],
-        group: ['status']
-      });
-
-      const formattedStats = stats.reduce((acc, stat) => {
-        acc[stat.status] = parseInt(stat.dataValues.count);
-        return acc;
-      }, {});
-
-      res.json({
-        success: true,
-        data: formattedStats
-      });
-
-    } catch (error) {
-      console.error('Error fetching appointment statistics:', error);
       res.status(500).json({ 
         success: false, 
         error: error.message 

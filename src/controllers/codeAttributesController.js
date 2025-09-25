@@ -12,13 +12,30 @@ const CodeAttributes = models.code_attributes; // Related model for attributes
 module.exports = {
   create: async (req, res) => {
     try {
-        const dataToCreate = {
+      // Check if code already exists in the same group
+      const existingCode = await CodeAttributes.findOne({
+        where: { 
+          code: req.body.code,
+          group_code_id: req.body.group_code_id 
+        }
+      });
+
+      if (existingCode) {
+        return res.status(409).json({ 
+          error: 'Code already exists in this group',
+          field: 'code',
+          type: 'duplicate' 
+        });
+      }
+
+      const dataToCreate = {
         ...req.body,
-        created_by: 'admin', 
+        created_by: 'admin',
         updated_date: new Date().toISOString(),
-        updated_by: 'admin', // or get from authenticated user
+        updated_by: 'admin',
         is_active: req.body.is_active !== undefined ? req.body.is_active : true
       };
+      
       const codeAttr = await CodeAttributes.create(dataToCreate);
       res.status(201).json(codeAttr);
     } catch (error) {
@@ -63,13 +80,33 @@ findByGroupCodeId: async (req, res) => {
   update: async (req, res) => {
     try {
       const id = req.params.id;
-        const dataToUpdate = {
+      
+      // Check if code already exists in the same group (excluding current record)
+      const existingCode = await CodeAttributes.findOne({
+        where: { 
+          code: req.body.code,
+          group_code_id: req.body.group_code_id,
+          serial_no: { [sequelize.Op.ne]: id } // Exclude current record
+        }
+      });
+
+      if (existingCode) {
+        return res.status(409).json({ 
+          error: 'Code already exists in this group',
+          field: 'code',
+          type: 'duplicate' 
+        });
+      }
+
+      const dataToUpdate = {
         ...req.body,
         updated_date: new Date().toISOString(),
-        updated_by: 'admin' // or get from authenticated user
+        updated_by: 'admin'
       };
+      
       const updated = await CodeAttributes.update(dataToUpdate, { where: { serial_no: id } });
       if (updated[0] === 0) return res.status(404).json({ error: 'Code Attribute not found' });
+      
       const updatedCodeAttr = await CodeAttributes.findByPk(id);
       res.json(updatedCodeAttr);
     } catch (error) {

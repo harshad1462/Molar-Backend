@@ -31,7 +31,7 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.BOOLEAN,
       allowNull: true
     },
-    minimum_ride_amount: {
+    minimum_subscription_amt: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
@@ -46,6 +46,11 @@ module.exports = function(sequelize, DataTypes) {
     total_coupon: {
       type: DataTypes.INTEGER,
       allowNull: false
+    },
+    specific_users: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Array of user IDs when coupon is for specific users only. NULL = everyone can use'
     },
     created_by: {
       type: DataTypes.STRING(255),

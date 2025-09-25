@@ -3,11 +3,11 @@ require('dotenv').config();
 
 const sequelize = new Sequelize(
   process.env.DB_NAME || 'molarmap',
-  process.env.DBUSER || 'root',
-  process.env.PASSWD || 'root', {
+  process.env.DB_USER || 'root',
+  process.env.DB_PASS || 'root', {
   host: 'localhost',  // or your DB host
   dialect: 'mysql',
-  port: 3306,         // change port if needed
+  port: process.env.DB_PORT || 3306,         // change port if needed
   logging: false      // disable SQL logging, optional
 });
 
