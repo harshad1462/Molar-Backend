@@ -17,7 +17,6 @@ module.exports = function(sequelize, DataTypes) {
     sequelize,
     tableName: 'case_study_images',
     timestamps: false,
-    id: false,
     indexes: [
       {
         name: "FKimo80fk70jukh91nwxbcjfp6q",

@@ -259,6 +259,167 @@ module.exports = {
         message: error.message 
       });
     }
+  },
+
+      // NEW METHOD 1: Get available packages for mobile app (with discount calculation)
+  getAvailablePackages: async (req, res) => {
+    try {
+      // Get only active packages
+      const packages = await Packages.findAll({
+        where: { status: 1 }, // Only active packages
+        attributes: [
+          'package_id',
+          'package_name',
+          'price',
+          'duration_days',
+          'features'
+        ],
+        order: [['price', 'ASC']]
+      });
+
+      // Helper function to generate random discount percentage (25-40%)
+      const getRandomDiscount = () => 25 + Math.floor(Math.random() * 16);
+
+      const formattedPackages = packages.map(pkg => {
+        const sellPrice = Number(pkg.price);
+        const discountPercent = getRandomDiscount(); // 25-40%
+        const mrp = Math.round(sellPrice / (1 - discountPercent / 100)); // Calculate MRP
+        const actualSavePercent = Math.round(((mrp - sellPrice) / mrp) * 100);
+
+        // Parse features from comma-separated text to array
+        const featuresArray = (pkg.features || '')
+          .split(',')
+          .map(feature => feature.trim())
+          .filter(feature => feature.length > 0);
+
+        return {
+          id: pkg.package_id,
+          name: pkg.package_name,
+          sellPrice: sellPrice,
+          mrp: mrp,
+          savePercent: actualSavePercent,
+          currency: '₹',
+          duration: pkg.duration_days,
+          features: featuresArray,
+          // Add flags for UI styling
+          popular: sellPrice >= 1000 && sellPrice <= 2000,
+          recommended: pkg.duration_days >= 180,
+          mostPopular: pkg.duration_days >= 150 && pkg.duration_days <= 200
+        };
+      });
+
+      res.json({
+        success: true,
+        packages: formattedPackages
+      });
+
+    } catch (error) {
+      console.error('Error fetching available packages:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  },
+
+  // NEW METHOD 2: Get single package for mobile app (with discount)
+  getPackageForApp: async (req, res) => {
+    try {
+      const packageId = req.params.id;
+
+      const package = await Packages.findOne({
+        where: { 
+          package_id: packageId,
+          status: 1 // Only active packages
+        },
+        attributes: [
+          'package_id',
+          'package_name',
+          'price',
+          'duration_days',
+          'features'
+        ]
+      });
+
+      if (!package) {
+        return res.status(404).json({
+          success: false,
+          error: 'Package not found or inactive'
+        });
+      }
+
+      const sellPrice = Number(package.price);
+      const discountPercent = 30; // Fixed 30% for single package view
+      const mrp = Math.round(sellPrice / (1 - discountPercent / 100));
+
+      // Parse features
+      const featuresArray = (package.features || '')
+        .split(',')
+        .map(feature => feature.trim())
+        .filter(feature => feature.length > 0);
+
+      const formattedPackage = {
+        id: package.package_id,
+        name: package.package_name,
+        sellPrice: sellPrice,
+        mrp: mrp,
+        savePercent: discountPercent,
+        currency: '₹',
+        duration: package.duration_days,
+        features: featuresArray
+      };
+
+      res.json({
+        success: true,
+        package: formattedPackage
+      });
+
+    } catch (error) {
+      console.error('Error fetching package:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  },
+
+  // NEW METHOD 3: Get packages summary (for dashboard stats)
+  getPackagesSummary: async (req, res) => {
+    try {
+      const summary = await sequelize.query(`
+        SELECT 
+          COUNT(*) as total_packages,
+          COUNT(CASE WHEN status = 1 THEN 1 END) as active_packages,
+          COUNT(CASE WHEN status = 0 THEN 1 END) as inactive_packages,
+          AVG(price) as average_price,
+          MIN(price) as min_price,
+          MAX(price) as max_price
+        FROM packages
+      `, {
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const packageStats = summary[0];
+
+      res.json({
+        success: true,
+        summary: {
+          totalPackages: parseInt(packageStats.total_packages),
+          activePackages: parseInt(packageStats.active_packages),
+          inactivePackages: parseInt(packageStats.inactive_packages),
+          averagePrice: Math.round(packageStats.average_price || 0),
+          minPrice: packageStats.min_price || 0,
+          maxPrice: packageStats.max_price || 0
+        }
+      });
+
+    } catch (error) {
+      console.error('Error fetching packages summary:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
   }
 
 };

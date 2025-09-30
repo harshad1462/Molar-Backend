@@ -62,6 +62,68 @@ module.exports = {
     }
   },
 
+findOneWithAttributesByName: async (req, res) => {
+  try {
+    const name = req.params.name; 
+    
+    if (!name) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Group code name is required' 
+      });
+    }
+
+    const groupCode = await group_code.findOne({
+      where: {
+        group_code: name
+      },
+      include: [{
+        model: code_attributes,
+        as: 'code_attributes',
+        attributes: ['code'], // Only select the 'code' field
+        where: {
+          is_active: true // Only include active attributes
+        },
+        required: false // This allows returning group_code even if no active attributes found
+      }],
+    });
+    
+    if (!groupCode) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Group Code not found with the specified name' 
+      });
+    }
+
+    // Check if there are any active code attributes
+    if (!groupCode.code_attributes || groupCode.code_attributes.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'No active code attributes found for this group code' 
+      });
+    }
+    
+    // Extract only the code values from the array
+    const codes = groupCode.code_attributes.map(attr => attr.code);
+    
+    // Return only the codes array
+    res.status(200).json({
+      success: true,
+      message: 'Code attributes retrieved successfully',
+      data: codes
+    });
+    
+  } catch (error) {
+    console.error('Error fetching code attributes:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error while fetching code attributes',
+      details: error.message 
+    });
+  }
+},
+
+
   // Update a group code by ID
  update: async (req, res) => {
     try {

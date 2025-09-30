@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const packageController = require('../controllers/packageController');
 
+router.get('/available', packageController.getAvailablePackages);
+
 // GET all subscription plans
 router.get('/', packageController.findAll);
 
@@ -19,5 +21,6 @@ router.patch('/:id/status', packageController.updateStatus);
 
 // DELETE package
 router.delete('/:id', packageController.delete);
+
 
 module.exports = router;

@@ -33,7 +33,7 @@ module.exports = function(sequelize, DataTypes) {
     },
     minimum_subscription_amt: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     remaining_coupon: {
       type: DataTypes.INTEGER,
@@ -46,11 +46,6 @@ module.exports = function(sequelize, DataTypes) {
     total_coupon: {
       type: DataTypes.INTEGER,
       allowNull: false
-    },
-    specific_users: {
-      type: DataTypes.JSON,
-      allowNull: true,
-      comment: 'Array of user IDs when coupon is for specific users only. NULL = everyone can use'
     },
     created_by: {
       type: DataTypes.STRING(255),
@@ -67,6 +62,11 @@ module.exports = function(sequelize, DataTypes) {
     updated_date: {
       type: DataTypes.DATE(6),
       allowNull: true
+    },
+    specific_users: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: "Array of user IDs when coupon is for specific users only. NULL = everyone can use"
     }
   }, {
     sequelize,

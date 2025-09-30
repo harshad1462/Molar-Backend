@@ -4,7 +4,9 @@ const cors = require('cors');
 const path = require('path');
 
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:3000'], // Add your frontend URLs
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:19006', // Expo development server
+    'http://10.0.2.2:3000', // Android emulator
+    'http://localhost:8081'], // Add your frontend URLs
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -38,6 +40,7 @@ const caseStudyRoutes = require('./src/routes/caseStudyRoutes')
 const reviewRoutes = require('./src/routes/reviewRoutes');
 const adminRoutes= require('./src/routes/adminRoutes');
 const internRoutes = require("./src/routes/internRoutes");
+const consultantRoutes= require('./src/routes/consultantRoutes');
 
 
 // Use routes
@@ -53,6 +56,7 @@ app.use('/api/case-studies', caseStudyRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin',adminRoutes);
 app.use('/api/intern', internRoutes);
+app.use('/api/consultants', consultantRoutes);
 
 const PORT = process.env.PORT || 3000;
 

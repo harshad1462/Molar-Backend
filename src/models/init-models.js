@@ -3,6 +3,7 @@ var _appointments = require("./appointments");
 var _case_studies = require("./case_studies");
 var _case_study_images = require("./case_study_images");
 var _case_study_pdfs = require("./case_study_pdfs");
+var _clinics = require("./clinics");
 var _code_attributes = require("./code_attributes");
 var _coupon_usage = require("./coupon_usage");
 var _coupons = require("./coupons");
@@ -21,6 +22,7 @@ function initModels(sequelize) {
   var case_studies = _case_studies(sequelize, DataTypes);
   var case_study_images = _case_study_images(sequelize, DataTypes);
   var case_study_pdfs = _case_study_pdfs(sequelize, DataTypes);
+  var clinics = _clinics(sequelize, DataTypes);
   var code_attributes = _code_attributes(sequelize, DataTypes);
   var coupon_usage = _coupon_usage(sequelize, DataTypes);
   var coupons = _coupons(sequelize, DataTypes);
@@ -50,6 +52,8 @@ function initModels(sequelize) {
   users.hasMany(appointments, { as: "doctor_user_appointments", foreignKey: "doctor_user_id"});
   case_studies.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(case_studies, { as: "case_studies", foreignKey: "user_id"});
+  clinics.belongsTo(users, { as: "user", foreignKey: "user_id"});
+  users.hasMany(clinics, { as: "clinics", foreignKey: "user_id"});
   coupon_usage.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(coupon_usage, { as: "coupon_usages", foreignKey: "user_id"});
   jobs.belongsTo(users, { as: "doctor_user", foreignKey: "doctor_user_id"});
@@ -70,6 +74,7 @@ function initModels(sequelize) {
     case_studies,
     case_study_images,
     case_study_pdfs,
+    clinics,
     code_attributes,
     coupon_usage,
     coupons,

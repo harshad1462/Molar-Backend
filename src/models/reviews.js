@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-module.exports = function (sequelize, DataTypes) {
+module.exports = function(sequelize, DataTypes) {
   return sequelize.define('reviews', {
     review_id: {
       autoIncrement: true,
@@ -48,9 +48,9 @@ module.exports = function (sequelize, DataTypes) {
       }
     },
     status: {
-      type: DataTypes.ENUM('APPROVE', 'DISAPPROVE'),
+      type: DataTypes.ENUM('APPROVE','DISAPPROVE'),
       allowNull: false,
-      defaultValue: 'APPROVE'
+      defaultValue: "APPROVE"
     }
   }, {
     sequelize,

@@ -5,7 +5,8 @@ const groupCodeController = require('../controllers/groupCodeController');
 router.post('/', groupCodeController.create);
 router.get('/', groupCodeController.findAll);
 router.get('/:id', groupCodeController.findOneWithAttributes); // includes code attributes
+router.get('/:name/attributes', groupCodeController.findOneWithAttributesByName);//for app serching from master code
 router.put('/:id', groupCodeController.update);
-router.delete('/:id', groupCodeController.delete);
+// router.delete('/:id', groupCodeController.delete);
 
 module.exports = router;

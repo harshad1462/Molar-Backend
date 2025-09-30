@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-module.exports = function(sequelize, DataTypes) {
+module.exports = function (sequelize, DataTypes) {
   return sequelize.define('users', {
     user_id: {
       autoIncrement: true,
@@ -30,7 +30,7 @@ module.exports = function(sequelize, DataTypes) {
     },
     dci_registration: {
       type: DataTypes.STRING(255),
-      allowNull: false
+      allowNull: true
     },
     degree_certificate: {
       type: DataTypes.STRING(255),
@@ -43,7 +43,7 @@ module.exports = function(sequelize, DataTypes) {
     },
     identity_proof: {
       type: DataTypes.STRING(255),
-      allowNull: false
+      allowNull: true
     },
     name: {
       type: DataTypes.STRING(255),
@@ -67,7 +67,7 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: true
     },
     role: {
-      type: DataTypes.ENUM('ADMIN','DOCTOR','INTERN'),
+      type: DataTypes.ENUM('ADMIN', 'DOCTOR', 'INTERN'),
       allowNull: true
     },
     specialization: {
@@ -75,7 +75,7 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: true
     },
     status: {
-      type: DataTypes.ENUM('ACTIVE','INACTIVE'),
+      type: DataTypes.ENUM('ACTIVE', 'INACTIVE'),
       allowNull: true
     },
     username: {
@@ -83,29 +83,15 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: true,
       unique: "UKr43af9ap4edm43mmtq01oddj6"
     },
-    area: {
-      type: DataTypes.STRING(100),
-      allowNull: true
+    is_verified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false
     },
-    city: {
-      type: DataTypes.STRING(50),
-      allowNull: true
-    },
-    pin_code: {
-      type: DataTypes.STRING(7),
-      allowNull: true
-    },
-    clinic_latitude: {
-      type: DataTypes.DOUBLE,
-      allowNull: true
-    },
-    clinic_longitude: {
-      type: DataTypes.DOUBLE,
-      allowNull: true
-    },
-    clinic_name: {
-      type: DataTypes.STRING(255),
-      allowNull: true
+    has_subscription: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false
     }
   }, {
     sequelize,

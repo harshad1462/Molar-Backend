@@ -124,4 +124,45 @@ findByGroupCodeId: async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   },
+  toggleStatus: async (req, res) => {
+    try {
+      const id = req.params.id;
+      
+      // First get current record
+      const currentRecord = await CodeAttributes.findByPk(id);
+      if (!currentRecord) {
+        return res.status(404).json({ error: 'Code Attribute not found' });
+      }
+
+      // Toggle the status
+      const newStatus = currentRecord.is_active ? false : true;
+      const newStatusText = newStatus ? 'active' : 'inactive';
+
+      const dataToUpdate = {
+        is_active: newStatus,
+        status: newStatusText,
+        updated_date: new Date().toISOString(),
+        updated_by: 'admin'
+      };
+      
+      const updated = await CodeAttributes.update(dataToUpdate, { where: { serial_no: id } });
+      if (updated[0] === 0) {
+        return res.status(404).json({ error: 'Code Attribute not found' });
+      }
+      
+      const updatedCodeAttr = await CodeAttributes.findByPk(id);
+      res.json({
+        success: true,
+        message: 'Status updated successfully',
+        data: updatedCodeAttr
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to toggle status',
+        details: error.message 
+      });
+    }
+  },
+
 };

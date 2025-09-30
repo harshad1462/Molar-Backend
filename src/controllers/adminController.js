@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
+const users = require('../models/users');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '1h';
@@ -118,7 +119,131 @@ const adminController = {
       console.error('Admin login error:', error);
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
+  },
+
+  //MEthods to manage subscriptions from admin side-
+  // Add these functions to your controller for testing
+// Admin function to verify a user
+verifyUser: async (req, res) => {
+  try {
+    const { phone_number } = req.body;
+    
+    const user = await users.findOne({
+      where: { phone_number }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await users.update(
+      { 
+        is_verified: true,
+        updated_by: 'admin',
+        updated_date: getISTDate()
+      },
+      { where: { phone_number } }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'User verified successfully'
+    });
+
+  } catch (error) {
+    console.error('Verify User Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify user',
+      error: error.message
+    });
   }
+},
+
+// Admin function to activate subscription
+activateSubscription: async (req, res) => {
+  try {
+    const { phone_number } = req.body;
+    
+    const user = await users.findOne({
+      where: { phone_number }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await users.update(
+      { 
+        has_subscription: true,
+        updated_by: 'admin',
+        updated_date: getISTDate()
+      },
+      { where: { phone_number } }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Subscription activated successfully'
+    });
+
+  } catch (error) {
+    console.error('Activate Subscription Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to activate subscription',
+      error: error.message
+    });
+  }
+},
+
+// Helper function to set both verification and subscription (for testing)
+setupUserAccess: async (req, res) => {
+  try {
+    const { phone_number } = req.body;
+    
+    const user = await users.findOne({
+      where: { phone_number }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await users.update(
+      { 
+        is_verified: true,
+        has_subscription: true,
+        updated_by: 'admin',
+        updated_date: getISTDate()
+      },
+      { where: { phone_number } }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'User verification and subscription activated successfully'
+    });
+
+  } catch (error) {
+    console.error('Setup User Access Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to setup user access',
+      error: error.message
+    });
+  }
+}
+
 };
 
 module.exports = adminController;
