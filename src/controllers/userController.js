@@ -173,5 +173,44 @@ module.exports = {
         error: error.message 
       });
     }
+  },
+
+    // Add this to your userController.js
+updateProfile: async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const updateData = {
+      ...req.body,
+      updated_date: new Date()
+    };
+
+    const [updatedRows] = await Users.update(updateData, {
+      where: { user_id: userId }
+    });
+
+    if (updatedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const updatedUser = await Users.findByPk(userId, {
+      attributes: { exclude: ['password'] } // Don't return password
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
+}
 };

@@ -8,4 +8,7 @@ router.get('/', userController.findAll);
 // GET /api/users/:id - Get single user by ID
 router.get('/:id', userController.findOne);
 
+// Add this to your userRoutes.js
+router.put('/:id', userController.updateProfile);
+
 module.exports = router;

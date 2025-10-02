@@ -92,6 +92,25 @@ module.exports = function (sequelize, DataTypes) {
       type: DataTypes.BOOLEAN,
       allowNull: true,
       defaultValue: false
+    },
+    identity_proof_status: {
+      type: DataTypes.ENUM('PENDING', 'VERIFIED', 'REJECTED'),
+      allowNull: true,
+      defaultValue: 'PENDING'
+    },
+    degree_certificate_status: {
+      type: DataTypes.ENUM('PENDING', 'VERIFIED', 'REJECTED'),
+      allowNull: true,
+      defaultValue: 'PENDING'
+    },
+    dci_registration_status: {
+      type: DataTypes.ENUM('PENDING', 'VERIFIED', 'REJECTED'),
+      allowNull: true,
+      defaultValue: 'PENDING'
+    },
+    experience_letter: {
+      type: DataTypes.STRING(500), 
+      allowNull: true
     }
   }, {
     sequelize,
