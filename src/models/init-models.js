@@ -11,6 +11,7 @@ var _group_code = require("./group_code");
 var _jobs = require("./jobs");
 var _packages = require("./packages");
 var _payment = require("./payment");
+var _requests = require("./request"); 
 var _reviews = require("./reviews");
 var _subscribers = require("./subscribers");
 var _token = require("./token");
@@ -30,6 +31,7 @@ function initModels(sequelize) {
   var jobs = _jobs(sequelize, DataTypes);
   var packages = _packages(sequelize, DataTypes);
   var payment = _payment(sequelize, DataTypes);
+    var requests = _requests(sequelize, DataTypes);  
   var reviews = _reviews(sequelize, DataTypes);
   var subscribers = _subscribers(sequelize, DataTypes);
   var token = _token(sequelize, DataTypes);
@@ -46,6 +48,14 @@ function initModels(sequelize) {
   group_code.hasMany(code_attributes, { as: "code_attributes", foreignKey: "group_code_id"});
   subscribers.belongsTo(packages, { as: "package", foreignKey: "package_id"});
   packages.hasMany(subscribers, { as: "subscribers", foreignKey: "package_id"});
+
+    requests.belongsTo(clinics, { as: "clinic", foreignKey: "clinic_id"});
+  clinics.hasMany(requests, { as: "requests", foreignKey: "clinic_id"});
+  requests.belongsTo(users, { as: "creator", foreignKey: "user_id"});
+  users.hasMany(requests, { as: "created_requests", foreignKey: "user_id"});
+  requests.belongsTo(users, { as: "assignedDoctor", foreignKey: "assigned_doctor_id"});
+  users.hasMany(requests, { as: "assigned_requests", foreignKey: "assigned_doctor_id"});
+  
   appointments.belongsTo(users, { as: "host_user", foreignKey: "host_user_id"});
   users.hasMany(appointments, { as: "appointments", foreignKey: "host_user_id"});
   appointments.belongsTo(users, { as: "doctor_user", foreignKey: "doctor_user_id"});
@@ -82,6 +92,7 @@ function initModels(sequelize) {
     jobs,
     packages,
     payment,
+     requests,
     reviews,
     subscribers,
     token,

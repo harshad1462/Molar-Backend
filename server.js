@@ -42,7 +42,8 @@ const adminRoutes= require('./src/routes/adminRoutes');
 const internRoutes = require("./src/routes/internRoutes");
 const consultantRoutes= require('./src/routes/consultantRoutes');
 const documentRoutes = require('./src/routes/documentRoutes');
-
+const clinicRoutes = require('./src/routes/clinicRoutes');
+const requestRoutes = require('./src/routes/requestsRoutes');
 
 // Use routes
 app.use('/api/appointments', appointmentRoutes);
@@ -59,6 +60,8 @@ app.use('/api/admin',adminRoutes);
 app.use('/api/intern', internRoutes);
 app.use('/api/consultants', consultantRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/clinics', clinicRoutes);
 
 const PORT = process.env.PORT || 3000;
 
