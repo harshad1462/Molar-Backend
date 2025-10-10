@@ -111,6 +111,16 @@ module.exports = function (sequelize, DataTypes) {
     experience_letter: {
       type: DataTypes.STRING(500), 
       allowNull: true
+    },
+     fcm_token: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: 'Firebase Cloud Messaging device token'
+    },
+    fcm_token_updated_at: {
+      type: DataTypes.DATE(6),
+      allowNull: true,
+      comment: 'Last time FCM token was updated'
     }
   }, {
     sequelize,
@@ -157,6 +167,13 @@ module.exports = function (sequelize, DataTypes) {
           { name: "username" },
         ]
       },
+         {
+        name: "idx_fcm_token",
+        using: "BTREE",
+        fields: [
+          { name: "fcm_token" },
+        ]
+      }
     ]
   });
 };

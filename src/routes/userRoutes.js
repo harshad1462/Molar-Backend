@@ -10,5 +10,8 @@ router.get('/:id', userController.findOne);
 
 // Add this to your userRoutes.js
 router.put('/:id', userController.updateProfile);
+router.post('/update-fcm-token', userController.updateFCMToken);
+router.delete('/delete-fcm-token', userController.deleteFCMToken);
+router.get('/tokens', userController.getUsersWithTokens);
 
 module.exports = router;

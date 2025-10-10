@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const path = require('path');
+const firebase = require('./src/config/firebase');
 
 const corsOptions = {
   origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:19006', // Expo development server
@@ -44,7 +45,8 @@ const consultantRoutes= require('./src/routes/consultantRoutes');
 const documentRoutes = require('./src/routes/documentRoutes');
 const clinicRoutes = require('./src/routes/clinicRoutes');
 const requestRoutes = require('./src/routes/requestsRoutes');
-
+const fcmRoutes = require('./src/routes/fcm');
+const hostRoutes=require('./src/routes/hostRoutes');
 // Use routes
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/group-codes', groupCodeRoutes);
@@ -62,7 +64,8 @@ app.use('/api/consultants', consultantRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/clinics', clinicRoutes);
-
+app.use('/api/fcm', fcmRoutes);
+app.use('/api/host',hostRoutes);
 const PORT = process.env.PORT || 3000;
 
 // Test DB connection and start server

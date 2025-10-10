@@ -212,5 +212,150 @@ updateProfile: async (req, res) => {
       error: error.message
     });
   }
-}
+},
+
+  updateFCMToken: async (req, res) => {
+    try {
+      const { fcm_token, token_type, user_id } = req.body;
+      const userId = user_id || req.user?.userId || req.params.id;
+
+      console.log(`📱 Updating push token for user ${userId}`);
+      console.log(`Token type: ${token_type || 'EXPO'}`);
+
+      // Validate token
+      if (!fcm_token) {
+        return res.status(400).json({
+          success: false,
+          error: 'Push token is required'
+        });
+      }
+
+      // Validate user exists
+      const user = await Users.findByPk(userId);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+
+      // Update token in database
+      await Users.update(
+        {
+          fcm_token: fcm_token,
+          fcm_token_updated_at: new Date()
+        },
+        {
+          where: { user_id: userId }
+        }
+      );
+
+      console.log(`✅ Push token updated for user ${userId}`);
+      console.log(`Token preview: ${fcm_token.substring(0, 30)}...`);
+
+      res.json({
+        success: true,
+        message: 'Push token updated successfully',
+        data: {
+          user_id: userId,
+          token_updated: true,
+          updated_at: new Date()
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error updating push token:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update push token',
+        details: error.message
+      });
+    }
+  },
+
+  /**
+   * Delete FCM token (for logout)
+   */
+  deleteFCMToken: async (req, res) => {
+    try {
+      const userId = req.body.user_id || req.user?.userId || req.params.id;
+
+      await Users.update(
+        {
+          fcm_token: null,
+          fcm_token_updated_at: new Date()
+        },
+        {
+          where: { user_id: userId }
+        }
+      );
+
+      console.log(`🗑️ Push token deleted for user ${userId}`);
+
+      res.json({
+        success: true,
+        message: 'Push token deleted successfully'
+      });
+
+    } catch (error) {
+      console.error('Error deleting push token:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  },
+
+  /**
+   * Get users with push tokens (for testing)
+   */
+  getUsersWithTokens: async (req, res) => {
+    try {
+      const { role } = req.query;
+
+      let whereConditions = {
+        fcm_token: { [Op.ne]: null }
+      };
+
+      if (role) {
+        whereConditions.role = role.toUpperCase();
+      }
+
+      const users = await Users.findAll({
+        where: whereConditions,
+        attributes: [
+          'user_id',
+          'name',
+          'email',
+          'role',
+          'fcm_token',
+          'fcm_token_updated_at'
+        ],
+        order: [['fcm_token_updated_at', 'DESC']]
+      });
+
+      res.json({
+        success: true,
+        count: users.length,
+        data: users.map(user => ({
+          user_id: user.user_id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          has_token: !!user.fcm_token,
+          token_preview: user.fcm_token ? user.fcm_token.substring(0, 30) + '...' : null,
+          token_updated_at: user.fcm_token_updated_at
+        }))
+      });
+
+    } catch (error) {
+      console.error('Error fetching users with tokens:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
 };
