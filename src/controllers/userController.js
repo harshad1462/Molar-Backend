@@ -6,18 +6,11 @@ const models = initModels(sequelize);
 const Users = models.users;
 
 module.exports = {
-  // Get all users with search and pagination
   findAll: async (req, res) => {
     try {
-      const { 
-        page = 1, 
-        limit = 10, 
-        search = ''
-      } = req.query;
-
+      const { page = 1, limit = 10, search = '' } = req.query;
       const offset = (page - 1) * limit;
       
-      // Build search conditions
       let whereConditions = {};
       
       if (search) {
@@ -25,7 +18,7 @@ module.exports = {
           [Op.or]: [
             { name: { [Op.like]: `%${decodeURIComponent(search)}%` } },
             { email: { [Op.like]: `%${decodeURIComponent(search)}%` } },
-            { clinic_name: { [Op.like]: `%${decodeURIComponent(search)}%` } }
+            { phone_number: { [Op.like]: `%${decodeURIComponent(search)}%` } }
           ]
         };
       }
@@ -40,9 +33,7 @@ module.exports = {
           'phone_number',
           'status',
           'profile_pic_url',
-          'clinic_name',
-          'area',
-          'city',
+          'specialization',
           'created_date'
         ],
         order: [['created_date', 'DESC']], 
@@ -51,19 +42,17 @@ module.exports = {
         distinct: true
       });
 
-      // Map the data to match frontend expectations
       const mappedUsers = userData.rows.map(user => ({
         id: `MOLAR#${user.user_id}`,
         userId: user.user_id,
         name: user.name || 'N/A',
         role: user.role?.toLowerCase() || 'N/A',
-        address: `${user.area || ''} ${user.city || ''}`.trim() || 'N/A',
+        specialization: user.specialization || 'N/A',
         registrationDate: user.created_date ? new Date(user.created_date).toISOString().split('T')[0] : 'N/A',
         status: user.status?.toLowerCase() === 'active' ? 'active' : 'inactive',
-        userProfilePic: user.profile_pic_url || 'https://via.placeholder.com/80',
+        userProfilePic: user.profile_pic_url || null,
         email: user.email || 'N/A',
-        phoneNumber: user.phone_number || 'N/A',
-        clinicName: user.clinic_name || 'N/A'
+        phoneNumber: user.phone_number || 'N/A'
       }));
 
       res.json({
@@ -81,122 +70,216 @@ module.exports = {
 
     } catch (error) {
       console.error('Error fetching users:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
+      res.status(500).json({ success: false, error: error.message });
     }
   },
 
-  // Get single user by ID
-  findOne: async (req, res) => {
-    try {
-      const { id } = req.params;
+//  findOne: async (req, res) => {
+//   try {
+//     const { id } = req.params;
 
-      const user = await Users.findByPk(id, {
+//     const user = await Users.findByPk(id, {
+//       attributes: [
+//         'user_id',
+//         'name',
+//         'email', 
+//         'phone_number',
+//         'role',
+//         'status',
+//         'profile_pic_url',
+//         'dci_number',
+//         'dci_registration',
+//         'degree_certificate',
+//         'identity_proof',
+//         'identity_proof_number',
+//         'qualification',
+//         'specialization',
+//         'username',
+//         'experience',
+//         'is_verified',
+//         'has_subscription',
+//         'identity_proof_status',
+//         'degree_certificate_status',
+//         'dci_registration_status',
+//         'created_date',
+//         'updated_date'
+//       ]
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({ success: false, error: 'User not found' });
+//     }
+
+//     const mappedUser = {
+//       user_id: user.user_id,
+//       id: user.user_id,
+//       name: user.name,
+//       email: user.email,
+//       phone_number: user.phone_number,
+//       phoneNumber: user.phone_number,
+//       role: user.role?.toLowerCase(),
+//       status: user.status,
+//       profile_pic_url: user.profile_pic_url,
+//       profileImage: user.profile_pic_url,
+//       username: user.username,
+//       qualification: user.qualification,
+//       specialization: user.specialization,
+//       experience: user.experience,
+//       dci_number: user.dci_number,
+//       dciNumber: user.dci_number,
+//       identity_proof: user.identity_proof,
+//       identityProof: user.identity_proof,
+//       identity_proof_number: user.identity_proof_number,
+//       identityProofNumber: user.identity_proof_number,
+//       dci_registration: user.dci_registration,
+//       degree_certificate: user.degree_certificate,
+//       is_verified: user.is_verified,
+//       isVerified: user.is_verified,
+//       has_subscription: user.has_subscription,
+//       hasSubscription: user.has_subscription,
+//       identity_proof_status: user.identity_proof_status,
+//       degree_certificate_status: user.degree_certificate_status,
+//       dci_registration_status: user.dci_registration_status,
+//       created_date: user.created_date,
+//       updated_date: user.updated_date
+//     };
+
+//     res.json({ success: true, user: mappedUser });
+
+//   } catch (error) {
+//     console.error('Error fetching user:', error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// },
+findOne: async (req, res) => {
+  try {
+    const { id } = req.params;
+    const Clinics = models.clinics; // Add this
+
+    const user = await Users.findByPk(id, {
+      attributes: [
+        'user_id', 'name', 'email', 'phone_number', 'role', 'status',
+        'profile_pic_url', 'dci_number', 'dci_registration',
+        'degree_certificate', 'identity_proof', 'identity_proof_number',
+        'qualification', 'specialization', 'username', 'experience',
+        'is_verified', 'has_subscription',
+        'identity_proof_status', 'degree_certificate_status', 'dci_registration_status',
+        'created_date', 'updated_date'
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Fetch primary clinic if not intern
+    let primaryClinic = null;
+    if (user.role !== 'INTERN') {
+      primaryClinic = await Clinics.findOne({
+        where: { 
+          user_id: id,
+          is_primary: true,
+          status: 'ACTIVE'
+        },
         attributes: [
-          'user_id',
-          'name',
-          'email', 
-          'phone_number',
-          'role',
-          'status',
-          'profile_pic_url',
-          'dci_number',
-          'dci_registration',
-          'degree_certificate',
-          'identity_proof',
-          'qualification',
-          'specialization',
-          'username',
-          'clinic_name',
-          'area',
-          'city',
-          'pin_code',
-          'clinic_latitude',
-          'clinic_longitude',
-          'created_date',
-          'updated_date'
+          'clinic_id', 'clinic_name', 'address', 'area', 
+          'city', 'pin_code', 'clinic_latitude', 'clinic_longitude'
         ]
       });
-
-      if (!user) {
-        return res.status(404).json({ 
-          success: false, 
-          error: 'User not found' 
-        });
-      }
-
-      // Map the data to match frontend expectations
-      const mappedUser = {
-        id: `MOLAR#${user.user_id}`,
-        userId: user.user_id,
-        userProfilePic: user.profile_pic_url || 'https://via.placeholder.com/80',
-        name: user.name || 'N/A',
-        email: user.email || 'N/A',
-        phoneNumber: user.phone_number || 'N/A',
-        role: user.role || 'N/A',
-        Status: user.status === 'ACTIVE' ? 'Active' : 'Inactive',
-        username: user.username || 'N/A',
-        qualification: user.qualification || 'N/A',
-        specialization: user.specialization || 'N/A',
-        documents: {
-          dciNumber: user.dci_number || 'N/A',
-          dciRegistration: user.dci_registration || 'N/A',
-          degreeCertificate: user.degree_certificate || 'https://via.placeholder.com/100',
-          identityProof: user.identity_proof || 'https://via.placeholder.com/100'
-        },
-        clinicDetails: {
-          clinicName: user.clinic_name || 'N/A',
-          area: user.area || 'N/A',
-          city: user.city || 'N/A',
-          pinCode: user.pin_code || 'N/A',
-          latitude: user.clinic_latitude || 'N/A',
-          longitude: user.clinic_longitude || 'N/A',
-          address: `${user.area || ''} ${user.city || ''} ${user.pin_code || ''}`.trim() || 'N/A'
-        },
-        timestamps: {
-          created: user.created_date ? new Date(user.created_date).toLocaleString() : 'N/A',
-          updated: user.updated_date ? new Date(user.updated_date).toLocaleString() : 'N/A'
-        }
-      };
-
-      res.json({
-        success: true,
-        data: mappedUser
-      });
-
-    } catch (error) {
-      console.error('Error fetching user:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error.message 
-      });
     }
-  },
 
-    // Add this to your userController.js
+    const mappedUser = {
+      user_id: user.user_id,
+      id: `MOLAR#${user.user_id}`,
+      name: user.name,
+      email: user.email,
+      phoneNumber: user.phone_number,
+      role: user.role,
+      status: user.status?.toLowerCase() === 'active' ? 'Active' : 'Inactive',
+      userProfilePic: user.profile_pic_url,
+      username: user.username,
+      qualification: user.qualification || 'N/A',
+      specialization: user.specialization || 'N/A',
+      experience: user.experience || 'N/A',
+      subscriptionStatus: user.has_subscription ? 'Active' : 'Inactive',
+      
+      // Documents with status
+      documents: {
+        identityProof: user.identity_proof,
+        identityProofNumber: user.identity_proof_number || 'N/A',
+        identityProofStatus: user.identity_proof_status,
+        
+        degreeCertificate: user.degree_certificate,
+        degreeCertificateStatus: user.degree_certificate_status,
+        
+        dciNumber: user.dci_number || 'N/A',
+        dciRegistration: user.dci_registration || 'N/A',
+        dciRegistrationStatus: user.dci_registration_status
+      },
+      
+      // Clinic details (only primary)
+      clinicDetails: primaryClinic ? {
+        clinicName: primaryClinic.clinic_name,
+        address: primaryClinic.address,
+        area: primaryClinic.area,
+        city: primaryClinic.city,
+        pinCode: primaryClinic.pin_code,
+        latitude: primaryClinic.clinic_latitude || 'N/A',
+        longitude: primaryClinic.clinic_longitude || 'N/A'
+      } : null,
+      
+      timestamps: {
+        created: user.created_date ? new Date(user.created_date).toLocaleString() : 'N/A',
+        updated: user.updated_date ? new Date(user.updated_date).toLocaleString() : 'N/A'
+      }
+    };
+
+    res.json({ success: true, data: mappedUser });
+
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+},
+
 updateProfile: async (req, res) => {
   try {
     const userId = req.params.id;
-    const updateData = {
-      ...req.body,
-      updated_date: new Date()
-    };
+    
+    const allowedFields = [
+      'name',
+      'email',
+      'phone_number',
+      'specialization',
+      'qualification',
+      'experience',
+      'dci_number',
+      'identity_proof',
+      'identity_proof_number'
+    ];
+
+    const updateData = {};
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    updateData.updated_date = new Date();
+    updateData.updated_by = req.body.updated_by || `user_${userId}`;
+
+    console.log('Updating user:', userId, 'with data:', updateData);
 
     const [updatedRows] = await Users.update(updateData, {
       where: { user_id: userId }
     });
 
     if (updatedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
 
     const updatedUser = await Users.findByPk(userId, {
-      attributes: { exclude: ['password'] } // Don't return password
+      attributes: { exclude: ['password'] }
     });
 
     res.json({
@@ -207,6 +290,125 @@ updateProfile: async (req, res) => {
 
   } catch (error) {
     console.error('Update profile error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+},
+verifyDocument: async (req, res) => {
+  try {
+    const { userId, documentType, status } = req.body;
+    
+    // Validate input
+    if (!userId || !documentType || !status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      });
+    }
+
+    // ✅ Allow all status transitions
+    if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status. Must be PENDING, VERIFIED, or REJECTED'
+      });
+    }
+
+    // Map document type to status field
+    const statusFieldMap = {
+      'identity_proof': 'identity_proof_status',
+      'degree_certificate': 'degree_certificate_status',
+      'dci_registration': 'dci_registration_status'
+    };
+
+    const statusField = statusFieldMap[documentType];
+    if (!statusField) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid document type'
+      });
+    }
+
+    // Update document status
+    const updateData = {
+      [statusField]: status,
+      updated_date: new Date(),
+      updated_by: 'admin'
+    };
+
+    await Users.update(updateData, {
+      where: { user_id: userId }
+    });
+
+    // Check if all documents are verified
+    const user = await Users.findByPk(userId, {
+      attributes: [
+        'identity_proof_status',
+        'degree_certificate_status',
+        'dci_registration_status',
+        'dci_number',
+        'role',
+        'is_verified'
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // ✅ Auto-verify user if all required documents are verified
+    let shouldVerifyUser = false;
+    
+    if (user.role === 'INTERN') {
+      shouldVerifyUser = 
+        user.identity_proof_status === 'VERIFIED' &&
+        user.degree_certificate_status === 'VERIFIED';
+    } else if (user.role === 'DOCTOR') {
+      shouldVerifyUser = 
+        user.identity_proof_status === 'VERIFIED' &&
+        user.degree_certificate_status === 'VERIFIED' &&
+        (!user.dci_number || user.dci_registration_status === 'VERIFIED');
+    }
+
+    // ✅ Auto-unverify if any document is rejected or pending
+    const hasRejectedOrPending = 
+      user.identity_proof_status === 'REJECTED' ||
+      user.degree_certificate_status === 'REJECTED' ||
+      (user.dci_number && user.dci_registration_status === 'REJECTED') ||
+      user.identity_proof_status === 'PENDING' ||
+      user.degree_certificate_status === 'PENDING' ||
+      (user.dci_number && user.dci_registration_status === 'PENDING');
+
+    // Update is_verified status
+    await Users.update(
+      { 
+        is_verified: shouldVerifyUser && !hasRejectedOrPending, 
+        updated_date: new Date(),
+        updated_by: 'admin'
+      },
+      { where: { user_id: userId } }
+    );
+
+    // Fetch updated user
+    const updatedUser = await Users.findByPk(userId, {
+      attributes: { exclude: ['password'] }
+    });
+
+    res.json({
+      success: true,
+      message: `Document status updated to ${status}`,
+      data: {
+        documentType,
+        newStatus: status,
+        isVerified: updatedUser.is_verified,
+        statusChanged: true
+      }
+    });
+
+  } catch (error) {
+    console.error('Verify document error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -357,5 +559,6 @@ updateProfile: async (req, res) => {
       });
     }
   }
+
 
 };

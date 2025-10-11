@@ -74,7 +74,8 @@ module.exports = function(sequelize, DataTypes) {
     },
     created_by: {
       type: DataTypes.STRING(255),
-      allowNull: false
+      allowNull: false,
+      defaultValue: 'system'
     },
     created_date: {
       type: DataTypes.DATE(6),

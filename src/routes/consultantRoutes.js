@@ -12,10 +12,12 @@ router.post('/verify-otp', consultantController.verifyOTP);
 
 // Authentication routes
 router.post('/auth/login', consultantController.loginUser);
-router.post('/login', consultantController.loginConsultant);
+// router.post('/login', consultantController.loginConsultant);
 router.post('/register', consultantController.registerConsultant);
 
 // Get all consultants
 router.get('/', consultantController.getAllConsultants);
+router.get('/:userId', consultantController.getConsultantById);
+
 
 module.exports = router;

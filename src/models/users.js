@@ -108,10 +108,6 @@ module.exports = function (sequelize, DataTypes) {
       allowNull: true,
       defaultValue: 'PENDING'
     },
-    experience_letter: {
-      type: DataTypes.STRING(500), 
-      allowNull: true
-    },
      fcm_token: {
       type: DataTypes.STRING(500),
       allowNull: true,
@@ -121,7 +117,18 @@ module.exports = function (sequelize, DataTypes) {
       type: DataTypes.DATE(6),
       allowNull: true,
       comment: 'Last time FCM token was updated'
-    }
+    },
+   experience: {
+  type: DataTypes.STRING(10),
+  allowNull: true,
+  comment: 'Years of experience'
+},
+identity_proof_number: {
+  type: DataTypes.STRING(100),
+  allowNull: true,
+  comment: 'Aadhaar/PAN/Passport number'
+}
+
   }, {
     sequelize,
     tableName: 'users',

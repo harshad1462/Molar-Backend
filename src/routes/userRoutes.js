@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
 
+// Add this route
+router.put('/verify-document', userController.verifyDocument);
+
 // GET /api/users - Get all users with search and pagination
 router.get('/', userController.findAll);
 
@@ -13,5 +16,8 @@ router.put('/:id', userController.updateProfile);
 router.post('/update-fcm-token', userController.updateFCMToken);
 router.delete('/delete-fcm-token', userController.deleteFCMToken);
 router.get('/tokens', userController.getUsersWithTokens);
+
+
+
 
 module.exports = router;

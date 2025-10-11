@@ -2,28 +2,22 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Document directories setup (using your exact path structure)
-const baseDir = path.join(__dirname, '../../Public/uploads/documents'); // ✅ FIXED PATH
+const baseDir = path.join(__dirname, '../../Public/uploads/documents');
 const identityProofDir = path.join(baseDir, 'identity-proof');
 const degreeCertificateDir = path.join(baseDir, 'degree-certificate');
 const dciRegistrationDir = path.join(baseDir, 'dci-registration');
-const experienceLetterDir = path.join(baseDir, 'experience-letter');
 
-// Create directories if they don't exist
-[baseDir, identityProofDir, degreeCertificateDir, dciRegistrationDir, experienceLetterDir].forEach(dir => {
+[baseDir, identityProofDir, degreeCertificateDir, dciRegistrationDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
-// ✅ SOLUTION: Store temp file first, then move in controller
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Always use base directory - we'll move the file later in controller
     cb(null, baseDir);
   },
   filename: function (req, file, cb) {
-    // Generate temporary filename  
     const timestamp = Date.now();
     const random = Math.round(Math.random() * 1E9);
     const extension = path.extname(file.originalname);
@@ -32,7 +26,6 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter for validation
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
     'image/jpeg',
@@ -48,13 +41,12 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configure multer
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per file
-    files: 1 // Single file upload
+    fileSize: 5 * 1024 * 1024,
+    files: 1
   }
 });
 
@@ -98,47 +90,5 @@ module.exports = {
       error: 'Server error during file upload: ' + error.message,
       code: 'SERVER_ERROR'
     });
-  },
-
-  // ✅ HELPER FUNCTIONS FOR CONTROLLER
-  getTargetDirectory: (documentType) => {
-    const dirMap = {
-      identityProof: identityProofDir,
-      aadhaarDocument: identityProofDir,
-      degreeDocument: degreeCertificateDir,
-      dciLicense: dciRegistrationDir,
-      experienceLetter: experienceLetterDir,
-      identity_proof: identityProofDir,
-      degree_certificate: degreeCertificateDir,
-      dci_registration: dciRegistrationDir,
-      experience_letter: experienceLetterDir
-    };
-    return dirMap[documentType] || baseDir;
-  },
-
-  generateFinalFilename: (userId, documentType, originalName) => {
-    const normalizeType = {
-      identityProof: 'identity_proof',
-      aadhaarDocument: 'identity_proof',
-      degreeDocument: 'degree_certificate',
-      dciLicense: 'dci_registration',
-      experienceLetter: 'experience_letter',
-      identity_proof: 'identity_proof',
-      degree_certificate: 'degree_certificate',
-      dci_registration: 'dci_registration',
-      experience_letter: 'experience_letter'
-    };
-    
-    const normalizedType = normalizeType[documentType] || documentType;
-    const timestamp = Date.now();
-    const random = Math.round(Math.random() * 1E9);
-    const extension = path.extname(originalName);
-    const nameWithoutExt = path.basename(originalName, extension);
-    const cleanName = nameWithoutExt
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9._-]/g, '')
-      .substring(0, 30);
-    
-    return `${normalizedType}_user${userId}_${timestamp}_${random}_${cleanName}${extension}`;
   }
 };
