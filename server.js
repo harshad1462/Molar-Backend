@@ -48,6 +48,8 @@ const requestRoutes = require('./src/routes/requestsRoutes');
 const paymentRoutes = require('./src/routes/payment')
 const fcmRoutes = require('./src/routes/fcm');
 const hostRoutes=require('./src/routes/hostRoutes');
+const consultantAppointmentsRoutes = require('./src/routes/consultantAppointmentsRoutes');
+
 // Use routes
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/group-codes', groupCodeRoutes);
@@ -68,6 +70,8 @@ app.use('/api/clinics', clinicRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/fcm', fcmRoutes);
 app.use('/api/host',hostRoutes);
+app.use('/api/consultant-appointments', consultantAppointmentsRoutes);
+
 const PORT = process.env.PORT || 3000;
 
 // Test DB connection and start server

@@ -11,6 +11,22 @@ const Request = models.requests;
 const Clinic = models.clinics;
 const User = models.users;
 
+// ✅ HELPER FUNCTION TO FIX MARIADB JSON PARSING
+const parseJSONField = (field) => {
+    if (!field) return [];
+    if (Array.isArray(field)) return field;
+    if (typeof field === 'string') {
+        try {
+            const parsed = JSON.parse(field);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            console.error('JSON parse error:', e);
+            return [];
+        }
+    }
+    return [];
+};
+
 /**
  * Get all requests created by the host (clinic owner)
  * Includes accepted doctors information
@@ -38,9 +54,7 @@ exports.getHostRequests = async (req, res) => {
                 {
                     model: Clinic,
                     as: 'clinic',
-                    // ✅ REMOVED phone_number - it doesn't exist in clinics table
                     attributes: ['clinic_id', 'clinic_name', 'city', 'address', 'area', 'pin_code', 'user_id'],
-                    // ✅ ADD nested include to get clinic owner's phone from users table
                     include: [
                         {
                             model: User,
@@ -61,15 +75,19 @@ exports.getHostRequests = async (req, res) => {
             offset: offset
         });
         
-        // ✅ FETCH ACCEPTED DOCTORS FOR EACH REQUEST
+        // ✅ FETCH ACCEPTED DOCTORS FOR EACH REQUEST - WITH JSON PARSING
         const enrichedRequests = await Promise.all(requests.map(async (request) => {
             const requestData = request.toJSON();
             
-            if (requestData.accepted_by_user_ids && requestData.accepted_by_user_ids.length > 0) {
+            // ✅ PARSE JSON FIELDS BEFORE USING THEM
+            const acceptedByUserIds = parseJSONField(requestData.accepted_by_user_ids);
+            const sentToUserIds = parseJSONField(requestData.sent_to_user_ids);
+            
+            if (acceptedByUserIds && acceptedByUserIds.length > 0) {
                 const acceptedDoctors = await User.findAll({
                     where: {
                         user_id: {
-                            [Op.in]: requestData.accepted_by_user_ids
+                            [Op.in]: acceptedByUserIds  // ✅ NOW IT'S AN ARRAY
                         }
                     },
                     attributes: [
@@ -88,7 +106,7 @@ exports.getHostRequests = async (req, res) => {
                 requestData.acceptedDoctors = [];
             }
             
-            requestData.pendingDoctorsCount = requestData.sent_to_user_ids ? requestData.sent_to_user_ids.length : 0;
+            requestData.pendingDoctorsCount = sentToUserIds.length;
             
             return requestData;
         }));
@@ -132,9 +150,7 @@ exports.getHostRequestById = async (req, res) => {
                 {
                     model: Clinic,
                     as: 'clinic',
-                    // ✅ REMOVED phone_number
                     attributes: ['clinic_id', 'clinic_name', 'city', 'address', 'area', 'pin_code', 'user_id'],
-                    // ✅ ADD nested include
                     include: [
                         {
                             model: User,
@@ -146,7 +162,7 @@ exports.getHostRequestById = async (req, res) => {
                 {
                     model: User,
                     as: 'assignedDoctor',
-                    attributes: ['user_id', 'name', 'phone_number', 'email', 'specialization',  'qualification', 'profile_pic_url'],
+                    attributes: ['user_id', 'name', 'phone_number', 'email', 'specialization', 'qualification', 'profile_pic_url'],
                     required: false
                 }
             ]
@@ -168,11 +184,14 @@ exports.getHostRequestById = async (req, res) => {
         
         const requestData = request.toJSON();
         
-        if (requestData.accepted_by_user_ids && requestData.accepted_by_user_ids.length > 0) {
+        // ✅ PARSE JSON FIELD BEFORE USING IT
+        const acceptedByUserIds = parseJSONField(requestData.accepted_by_user_ids);
+        
+        if (acceptedByUserIds && acceptedByUserIds.length > 0) {
             const acceptedDoctors = await User.findAll({
                 where: {
                     user_id: {
-                        [Op.in]: requestData.accepted_by_user_ids
+                        [Op.in]: acceptedByUserIds  // ✅ NOW IT'S AN ARRAY
                     }
                 },
                 attributes: [
@@ -209,7 +228,14 @@ exports.getHostRequestById = async (req, res) => {
 /**
  * Confirm/Select a specific doctor for a request
  */
+/**
+ * Confirm/Select a specific doctor for a request
+ * Only updates the request - NO appointment creation
+ */
 exports.confirmDoctor = async (req, res) => {
+    // ✅ USE TRANSACTION TO ENSURE DATA CONSISTENCY
+    const t = await sequelize.transaction();
+    
     try {
         const { requestId } = req.params;
         const { doctor_id, user_id, confirmation_notes } = req.body;
@@ -226,10 +252,12 @@ exports.confirmDoctor = async (req, res) => {
                     as: 'clinic',
                     attributes: ['clinic_id', 'clinic_name', 'user_id', 'city', 'address']
                 }
-            ]
+            ],
+            transaction: t
         });
         
         if (!request) {
+            await t.rollback();
             return res.status(404).json({
                 success: false,
                 error: 'Request not found'
@@ -237,43 +265,61 @@ exports.confirmDoctor = async (req, res) => {
         }
         
         if (request.user_id !== userId) {
+            await t.rollback();
             return res.status(403).json({
                 success: false,
                 error: 'You are not authorized to confirm doctors for this request'
             });
         }
         
-        if (!request.accepted_by_user_ids || !request.accepted_by_user_ids.includes(doctorId)) {
+        const acceptedByUserIds = parseJSONField(request.accepted_by_user_ids);
+        
+        if (!acceptedByUserIds || !acceptedByUserIds.includes(doctorId)) {
+            await t.rollback();
             return res.status(400).json({
                 success: false,
                 error: 'This doctor has not accepted the request yet'
             });
         }
         
-        const doctor = await User.findByPk(doctorId);
-        const host = await User.findByPk(userId);
+        const doctor = await User.findByPk(doctorId, { transaction: t });
+        const host = await User.findByPk(userId, { transaction: t });
         
         if (!doctor) {
+            await t.rollback();
             return res.status(404).json({
                 success: false,
                 error: 'Doctor not found'
             });
         }
         
+        // ✅ REMOVE ONLY THE ASSIGNED DOCTOR FROM accepted_by_user_ids
+                const updatedAcceptedByUserIds = acceptedByUserIds.filter(id => id !== doctorId);
+
+        console.log(`📋 Removing doctor ${doctorId} from accepted_by_user_ids`);
+        console.log(`👥 Before: ${acceptedByUserIds.length} doctors | After: ${updatedAcceptedByUserIds.length} doctors`);
+        
+        // ✅ UPDATE REQUEST STATUS TO CONFIRMED
         await request.update({
             assigned_doctor_id: doctorId,
+            accepted_by_user_ids: updatedAcceptedByUserIds,  // ✅ REMOVE ASSIGNED DOCTOR
             status: 'CONFIRMED',
             confirmation_notes: confirmation_notes || null,
             updated_by: host?.name || 'host',
             updated_date: new Date()
-        });
+        }, { transaction: t });
         
+        console.log(`✅ Request ${requestId} confirmed with doctor ${doctorId}`);
+        
+        // ✅ COMMIT TRANSACTION
+        await t.commit();
+        
+        // ✅ FETCH UPDATED REQUEST
         const updatedRequest = await Request.findByPk(requestId, {
             include: [
                 {
                     model: Clinic,
                     as: 'clinic',
-                    // ✅ REMOVED phone_number from here too
                     attributes: ['clinic_id', 'clinic_name', 'city', 'address']
                 },
                 {
@@ -284,28 +330,49 @@ exports.confirmDoctor = async (req, res) => {
             ]
         });
         
-        console.log(`✅ Doctor ${doctorId} confirmed for request ${requestId}`);
+        const appointmentDateTime = new Date(request.request_datetime);
         
-        // Send notification to confirmed doctor
+        // ✅ SEND NOTIFICATION TO CONFIRMED DOCTOR
         if (doctor?.fcm_token) {
             expoPushService.sendExpoPushNotification(
                 [doctor.fcm_token],
-                `🎉 You've Been Selected!`,
-                `${request.clinic?.clinic_name || 'A clinic'} has confirmed you for the ${request.specialization} consultation`,
+                `🎉 You've Been Confirmed!`,
+                `${request.clinic?.clinic_name || 'A clinic'} confirmed you for ${request.specialization} on ${appointmentDateTime.toLocaleDateString()}`,
                 {
                     request_id: requestId.toString(),
                     type: 'DOCTOR_CONFIRMED',
                     clinic_id: request.clinic_id.toString(),
-                    clinic_name: request.clinic?.clinic_name || ''
+                    clinic_name: request.clinic?.clinic_name || '',
+                    date: appointmentDateTime.toISOString(),
+                    amount: request.offering_rupees.toString(),
+                    specialization: request.specialization,
+                    status: 'CONFIRMED'
                 }
             ).catch(err => console.error('Push notification error:', err));
         }
         
-        // Notify other doctors
-        const otherDoctorIds = request.accepted_by_user_ids.filter(id => id !== doctorId);
-        if (otherDoctorIds.length > 0) {
+        // ✅ SEND NOTIFICATION TO HOST
+        if (host?.fcm_token) {
+            expoPushService.sendExpoPushNotification(
+                [host.fcm_token],
+                `✅ Doctor Confirmed`,
+                `Dr. ${doctor?.name} confirmed for ${request.specialization} on ${appointmentDateTime.toLocaleDateString()}`,
+                {
+                    request_id: requestId.toString(),
+                    type: 'DOCTOR_CONFIRMED',
+                    doctor_id: doctorId.toString(),
+                    doctor_name: doctor?.name || 'Doctor',
+                    date: appointmentDateTime.toISOString(),
+                    specialization: request.specialization,
+                    status: 'CONFIRMED'
+                }
+            ).catch(err => console.error('Push notification error:', err));
+        }
+        
+        // ✅ NOTIFY OTHER DOCTORS
+        if (updatedAcceptedByUserIds.length > 0) {
             const otherDoctors = await User.findAll({
-                where: { user_id: { [Op.in]: otherDoctorIds } },
+                where: { user_id: { [Op.in]: updatedAcceptedByUserIds } },
                 attributes: ['fcm_token']
             });
             
@@ -327,6 +394,7 @@ exports.confirmDoctor = async (req, res) => {
             }
         }
         
+        // ✅ RETURN ONLY REQUEST DATA
         res.json({
             success: true,
             data: updatedRequest,
@@ -335,10 +403,19 @@ exports.confirmDoctor = async (req, res) => {
                 doctor_id: doctorId,
                 doctor_name: doctor?.name || 'Unknown',
                 doctor_phone: doctor?.phone_number
-            }
+            },
+            request_info: {
+                request_id: requestId,
+                date: appointmentDateTime,
+                amount: request.offering_rupees,
+                status: 'CONFIRMED'
+            },
+            remaining_accepted_doctors: updatedAcceptedByUserIds.length
         });
         
     } catch (error) {
+        // ✅ ROLLBACK ON ERROR
+        await t.rollback();
         console.error('❌ Error confirming doctor:', error);
         res.status(500).json({
             success: false,
@@ -347,6 +424,7 @@ exports.confirmDoctor = async (req, res) => {
         });
     }
 };
+
 
 /**
  * Cancel a request
@@ -394,9 +472,12 @@ exports.cancelRequest = async (req, res) => {
         
         console.log(`✅ Request ${requestId} cancelled successfully`);
         
-        if (request.accepted_by_user_ids && request.accepted_by_user_ids.length > 0) {
+        // ✅ PARSE JSON FIELD BEFORE USING IT
+        const acceptedByUserIds = parseJSONField(request.accepted_by_user_ids);
+        
+        if (acceptedByUserIds && acceptedByUserIds.length > 0) {
             const doctors = await User.findAll({
-                where: { user_id: { [Op.in]: request.accepted_by_user_ids } },
+                where: { user_id: { [Op.in]: acceptedByUserIds } },
                 attributes: ['fcm_token']
             });
             

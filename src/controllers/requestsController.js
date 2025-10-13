@@ -461,6 +461,20 @@ const User = models.users;
 // JWT Secret (should match your auth controller)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-key';
 
+const parseJSONField = (field) => {
+    if (!field) return [];
+    if (Array.isArray(field)) return field;
+    if (typeof field === 'string') {
+        try {
+            const parsed = JSON.parse(field);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            console.error('JSON parse error:', e);
+            return [];
+        }
+    }
+    return [];
+};
 // Create a new request and send to qualified doctors
 exports.createRequest = async (req, res) => {
     try {
@@ -518,12 +532,26 @@ exports.createRequest = async (req, res) => {
                 status: 'ACTIVE',
                 is_verified: true,
                 specialization: specialization,
+                has_subscription: true,
                  user_id: {
                     [Op.ne]: userId  // ✅ EXCLUDE THE REQUEST CREATOR (user cannot send to themselves)
                 }
             },
             attributes: ['user_id', 'name', 'phone_number', 'specialization', 'fcm_token']
         });
+
+if (qualifiedDoctors.length === 0) {
+    return res.status(404).json({
+        success: false,
+        error: 'No qualified doctors available',
+        message: `Unfortunately, no ${specialization} doctors are currently available in ${clinic.city}. Please try again later.`,
+        details: {
+            specialization: specialization,
+            city: clinic.city,
+            suggestion: 'Try selecting a different specialization or check back later'
+        }
+    });
+}
 
         const sent_to_user_ids = qualifiedDoctors.map(doctor => doctor.user_id);
 
@@ -909,6 +937,7 @@ exports.getAllRequestsForDoctor = async (req, res) => {
 };
 
 // ✅ CORRECTED: Accept request WITHOUT assigning doctor immediately
+// ✅ CORRECTED: Accept request WITHOUT assigning doctor immediately
 exports.acceptRequest = async (req, res) => {
     try {
         const { requestId } = req.params;
@@ -948,7 +977,10 @@ exports.acceptRequest = async (req, res) => {
             });
         }
         
-        if (!request.sent_to_user_ids || !request.sent_to_user_ids.includes(userId)) {
+        // ✅ FIX: Parse sent_to_user_ids safely (handles string or array)
+        const sentToUserIds = parseJSONField(request.sent_to_user_ids);
+        
+        if (!sentToUserIds || !sentToUserIds.includes(userId)) {
             return res.status(403).json({
                 success: false,
                 error: 'You are not authorized to accept this request'
@@ -956,23 +988,23 @@ exports.acceptRequest = async (req, res) => {
         }
         
         // ✅ REMOVE USER FROM sent_to_user_ids
-        const updatedSentToUsers = (request.sent_to_user_ids || []).filter(id => id !== userId);
+        const updatedSentToUsers = sentToUserIds.filter(id => id !== userId);
+        
+        // ✅ FIX: Parse accepted_by_user_ids safely (handles string or array)
+        const acceptedUserIds = parseJSONField(request.accepted_by_user_ids);
         
         // ✅ ADD USER TO accepted_by_user_ids
-        let acceptedUsers = request.accepted_by_user_ids || [];
-        if (!acceptedUsers.includes(userId)) {
-            acceptedUsers.push(userId);
+        if (!acceptedUserIds.includes(userId)) {
+            acceptedUserIds.push(userId);
         }
         
         const doctor = await User.findByPk(userId);
         
-        // ✅ UPDATE WITHOUT assigned_doctor_id
-        // Status remains PENDING until clinic owner confirms a specific doctor
+        // ✅ UPDATE WITHOUT assigned_doctor_id - FIXED VARIABLE NAME
         await request.update({
-            sent_to_user_ids: updatedSentToUsers,           // Remove from sent list
-            accepted_by_user_ids: acceptedUsers,            // Add to accepted list
-            status: 'ACCEPTED',                             // Status changes to show doctors have responded
-            // ❌ DO NOT SET: assigned_doctor_id - only set when clinic confirms
+            sent_to_user_ids: updatedSentToUsers,
+            accepted_by_user_ids: acceptedUserIds,  // ✅ FIXED: Was acceptedUsers
+            status: 'ACCEPTED',
             updated_by: doctor?.name || 'doctor',
             updated_date: new Date()
         });
@@ -994,12 +1026,11 @@ exports.acceptRequest = async (req, res) => {
         
         console.log(`✅ Request ${requestId} accepted by doctor ${userId}`);
         console.log(`📋 Removed from sent_to_user_ids, added to accepted_by_user_ids`);
-        console.log(`👥 Total doctors who accepted: ${acceptedUsers.length}`);
+        console.log(`👥 Total doctors who accepted: ${acceptedUserIds.length}`);  // ✅ FIXED
         console.log(`👥 Remaining doctors pending: ${updatedSentToUsers.length}`);
         
         // Send notification to clinic owner
         if (request.creator?.fcm_token) {
-            const expoPushService = require('../services/expoPushService');
             expoPushService.sendExpoPushNotification(
                 [request.creator.fcm_token],
                 `✅ Doctor Accepted Your Request`,
@@ -1009,7 +1040,7 @@ exports.acceptRequest = async (req, res) => {
                     type: 'REQUEST_ACCEPTED',
                     doctor_id: userId.toString(),
                     doctor_name: doctor?.name || 'Doctor',
-                    total_acceptances: acceptedUsers.length.toString()
+                    total_acceptances: acceptedUserIds.length.toString()  // ✅ FIXED
                 }
             ).catch(err => console.error('Push notification error:', err));
         }
@@ -1021,7 +1052,7 @@ exports.acceptRequest = async (req, res) => {
             doctor_info: {
                 doctor_id: userId,
                 doctor_name: doctor?.name || 'Unknown',
-                total_doctors_accepted: acceptedUsers.length,
+                total_doctors_accepted: acceptedUserIds.length,  // ✅ FIXED
                 remaining_pending_doctors: updatedSentToUsers.length
             }
         });
