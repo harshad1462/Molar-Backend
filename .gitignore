@@ -2,7 +2,7 @@
 .env
 # Ignore everything inside Public/uploads
 Public/uploads/**
-
+serviceAccountKey.json
 # Allow folder structure and .gitkeep files
 !Public/uploads/
 !Public/uploads/**/
