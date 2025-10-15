@@ -508,37 +508,47 @@ exports.createRequest = async (req, res) => {
             });
         }
 
-        // Get clinic details and verify ownership
-        const clinic = await Clinic.findByPk(clinic_id);
-        if (!clinic) {
-            return res.status(404).json({
-                success: false,
-                error: 'Clinic not found'
-            });
-        }
+     // Get clinic details and verify ownership
+const clinic = await Clinic.findByPk(clinic_id);
+if (!clinic) {
+    return res.status(404).json({
+        success: false,
+        error: 'Clinic not found'
+    });
+}
 
-        // Security check: Verify user owns the clinic
-        if (clinic.user_id !== userId) {
-            return res.status(403).json({
-                success: false,
-                error: 'You are not authorized to create requests for this clinic'
-            });
-        }
+// Security check: Verify user owns the clinic
+if (clinic.user_id !== userId) {
+    return res.status(403).json({
+        success: false,
+        error: 'You are not authorized to create requests for this clinic'
+    });
+}
 
-        // Find qualified doctors with FCM tokens
-        const qualifiedDoctors = await User.findAll({
-            where: {
-                role: 'DOCTOR',
-                status: 'ACTIVE',
-                is_verified: true,
-                specialization: specialization,
-                has_subscription: true,
-                 user_id: {
-                    [Op.ne]: userId  // ✅ EXCLUDE THE REQUEST CREATOR (user cannot send to themselves)
-                }
-            },
-            attributes: ['user_id', 'name', 'phone_number', 'specialization', 'fcm_token']
-        });
+// ✅ Find doctors who have clinics in the same city (MySQL/MariaDB compatible)
+const qualifiedDoctors = await User.findAll({
+    where: {
+        role: 'DOCTOR',
+        status: 'ACTIVE',
+        is_verified: true,
+        specialization: specialization,
+        has_subscription: true,
+        user_id: {
+            [Op.ne]: userId  // Exclude the request creator
+        },
+        // Use EXISTS subquery - optimal for MySQL/MariaDB
+        [Op.and]: [
+            sequelize.literal(`EXISTS (
+                SELECT 1 FROM clinics 
+                WHERE clinics.user_id = users.user_id 
+                AND clinics.city = ${sequelize.escape(clinic.city)}
+                AND clinics.status = 'ACTIVE'
+                AND clinics.is_primary = 1
+            )`)
+        ]
+    },
+    attributes: ['user_id', 'name', 'phone_number', 'specialization', 'fcm_token']
+});
 
 if (qualifiedDoctors.length === 0) {
     return res.status(404).json({
@@ -547,7 +557,7 @@ if (qualifiedDoctors.length === 0) {
         message: `Unfortunately, no ${specialization} doctors are currently available in ${clinic.city}. Please try again later.`,
         details: {
             specialization: specialization,
-            city: clinic.city,
+            city: clinicOwner.city,
             suggestion: 'Try selecting a different specialization or check back later'
         }
     });
@@ -751,6 +761,7 @@ exports.getRequestById = async (req, res) => {
 
 
 // ✅ FIXED: Get pending requests for a specific doctor
+// ✅ FIXED: Get pending requests for a specific doctor (includes ACCEPTED status)
 exports.getPendingRequestsForDoctor = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -759,7 +770,11 @@ exports.getPendingRequestsForDoctor = async (req, res) => {
         
         const requests = await Request.findAll({
             where: {
-                status: 'PENDING',
+                // ✅ UPDATED: Include both PENDING and ACCEPTED status
+                status: {
+                    [Op.in]: ['PENDING', 'ACCEPTED']
+                },
+                // ✅ Only show if doctor ID is in sent_to_user_ids (not yet responded)
                 [Op.and]: [
                     sequelize.where(
                         sequelize.fn('JSON_CONTAINS',
@@ -775,7 +790,6 @@ exports.getPendingRequestsForDoctor = async (req, res) => {
                 {
                     model: Clinic,
                     as: 'clinic',
-                    // ✅ ONLY USE FIELDS THAT EXIST IN YOUR CLINICS TABLE
                     attributes: ['clinic_id', 'clinic_name', 'city', 'address', 'area', 'pin_code']
                 },
                 {
@@ -787,11 +801,24 @@ exports.getPendingRequestsForDoctor = async (req, res) => {
             order: [['created_date', 'DESC']]
         });
         
+        // ✅ ADD: Enrich response with acceptance info
+        const enrichedRequests = requests.map(request => {
+            const requestData = request.toJSON();
+            const acceptedByUserIds = parseJSONField(requestData.accepted_by_user_ids);
+            
+            return {
+                ...requestData,
+                has_other_acceptances: acceptedByUserIds.length > 0,
+                total_doctors_accepted: acceptedByUserIds.length,
+                is_competitive: acceptedByUserIds.length > 0 // Shows if doctor needs to compete
+            };
+        });
+        
         console.log(`✅ Found ${requests.length} pending requests for doctor ${userId}`);
         
         res.json({
             success: true,
-            data: requests,
+            data: enrichedRequests,
             count: requests.length,
             message: `Found ${requests.length} pending consultation requests`
         });
@@ -805,6 +832,7 @@ exports.getPendingRequestsForDoctor = async (req, res) => {
         });
     }
 };
+
 
 // ✅ FIXED: Get accepted requests for a doctor
 exports.getAcceptedRequestsForDoctor = async (req, res) => {
@@ -1094,9 +1122,20 @@ exports.declineRequest = async (req, res) => {
             });
         }
         
-        const sentToUsers = request.sent_to_user_ids || [];
-        const updatedSentTo = sentToUsers.filter(id => id !== userId);
+        // const sentToUsers = request.sent_to_user_ids || [];
+        // const updatedSentTo = sentToUsers.filter(id => id !== userId);
         
+          const sentToUsers = parseJSONField(request.sent_to_user_ids);
+ if (!sentToUsers || !sentToUsers.includes(userId)) {
+            return res.status(403).json({
+                success: false,
+                error: 'You are not authorized to decline this request'
+            });
+        }
+        
+        // ✅ NOW .filter() will work because it's an array
+        const updatedSentTo = sentToUsers.filter(id => id !== userId);
+       
         const doctor = await User.findByPk(userId);
         
         await request.update({
