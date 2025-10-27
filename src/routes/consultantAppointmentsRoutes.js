@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const consultantAppointmentsController = require('../controllers/consultantAppointmentsController');
 
+
+// ✅ ADD OTP ROUTES FIRST (BEFORE DYNAMIC ROUTES)
+router.post('/send-start-otp', consultantAppointmentsController.sendConsultationStartOTP);
+router.post('/verify-start-otp', consultantAppointmentsController.verifyConsultationStartOTP);
+
+
 /**
  * @route   GET /api/consultant-appointments/:consultantId
  * @desc    Get all appointments for a consultant

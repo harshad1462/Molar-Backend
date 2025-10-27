@@ -531,4 +531,185 @@ exports.getConsultantAppointmentCounts = async (req, res) => {
 };
 
 
+// ============================================
+// OTP FOR CONSULTATION START
+// ============================================
+
+// In-memory OTP storage (5 minutes expiry, static OTP: 1234)
+const otpStore = new Map();
+
+/**
+ * Send OTP to clinic for consultation start verification
+ */
+exports.sendConsultationStartOTP = async (req, res) => {
+  try {
+    const { request_id, consultant_id } = req.body;
+    
+    console.log(`📱 Sending OTP for request ${request_id}, consultant ${consultant_id}`);
+    
+    // Validate request exists and consultant is assigned
+    const request = await Request.findOne({
+      where: {
+        request_id: request_id,
+        assigned_doctor_id: parseInt(consultant_id),
+        status: 'CONFIRMED'
+      },
+      include: [
+        {
+          model: Clinic,
+          as: 'clinic',
+          attributes: ['clinic_id', 'clinic_name', 'user_id'],
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['user_id', 'name', 'phone_number']
+            }
+          ]
+        }
+      ]
+    });
+    
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        error: 'Request not found or you are not authorized'
+      });
+    }
+    
+    // Get clinic owner's phone number
+    const clinicPhone = request.clinic?.user?.phone_number;
+    
+    if (!clinicPhone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Clinic phone number not found'
+      });
+    }
+    
+    // Generate static OTP (or dynamic in production)
+    const otp = '1234'; // Static for testing
+    
+    const expiryTime = Date.now() + 5 * 60 * 1000; // 5 minutes
+    
+    // Store OTP
+    const otpKey = `consultation_start_${request_id}`;
+    otpStore.set(otpKey, {
+      otp: otp,
+      expiryTime: expiryTime,
+      clinicPhone: clinicPhone,
+      consultantId: consultant_id,
+      attempts: 0,
+      createdAt: Date.now()
+    });
+    
+    console.log(`✅ OTP stored: ${otp} (expires in 5 minutes)`);
+    
+    return res.status(200).json({
+      success: true,
+      message: `OTP sent to clinic phone ending with ${clinicPhone.slice(-4)}`,
+      masked_phone: `******${clinicPhone.slice(-4)}`,
+      debug_otp: otp // Remove in production
+    });
+    
+  } catch (error) {
+    console.error('❌ Error sending consultation start OTP:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to send OTP',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Verify OTP for consultation start
+ */
+exports.verifyConsultationStartOTP = async (req, res) => {
+  try {
+    const { request_id, consultant_id, otp } = req.body;
+    
+    console.log(`🔐 Verifying OTP for request ${request_id}`);
+    
+    const otpKey = `consultation_start_${request_id}`;
+    const storedData = otpStore.get(otpKey);
+    
+    if (!storedData) {
+      return res.status(400).json({
+        success: false,
+        error: 'OTP expired or not found. Please request a new OTP.'
+      });
+    }
+    
+    // Check expiry (5 minutes)
+    if (Date.now() > storedData.expiryTime) {
+      otpStore.delete(otpKey);
+      return res.status(400).json({
+        success: false,
+        error: 'OTP has expired. Please request a new OTP.'
+      });
+    }
+    
+    // Check attempts (max 3)
+    if (storedData.attempts >= 3) {
+      otpStore.delete(otpKey);
+      return res.status(400).json({
+        success: false,
+        error: 'Maximum OTP attempts exceeded. Please request a new OTP.'
+      });
+    }
+    
+    // Verify consultant ID matches
+    if (storedData.consultantId !== consultant_id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized consultant'
+      });
+    }
+    
+    // Verify OTP
+    if (storedData.otp !== otp.toString()) {
+      storedData.attempts += 1;
+      otpStore.set(otpKey, storedData);
+      
+      return res.status(400).json({
+        success: false,
+        error: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.`
+      });
+    }
+    
+    // OTP is valid - Clear it immediately
+    otpStore.delete(otpKey);
+    
+    console.log(`✅ OTP verified successfully for request ${request_id}`);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully',
+      verified: true
+    });
+    
+  } catch (error) {
+    console.error('❌ Error verifying consultation start OTP:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to verify OTP',
+      details: error.message
+    });
+  }
+};
+
+// Auto-cleanup expired OTPs every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, data] of otpStore.entries()) {
+    if (now > data.expiryTime) {
+      otpStore.delete(key);
+      console.log(`🧹 Cleaned up expired OTP: ${key}`);
+    }
+  }
+}, 10 * 60 * 1000);
+
+
+
 module.exports = exports;
